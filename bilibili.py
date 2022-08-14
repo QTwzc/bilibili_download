@@ -1,4 +1,3 @@
-from re import T
 import requests
 import os
 import time
