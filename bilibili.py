@@ -4,9 +4,10 @@ import time
 import qrcode
 import json
 from bs4 import BeautifulSoup
-from rich.progress import Progress, DownloadColumn, TransferSpeedColumn, SpinnerColumn, BarColumn, TimeRemainingColumn, TextColumn
+from rich.progress import Progress, DownloadColumn, TransferSpeedColumn, BarColumn, TimeRemainingColumn, TextColumn, TimeElapsedColumn
 from concurrent.futures import ThreadPoolExecutor
 import argparse
+import sys
 
 def login(headers:dict):
     """
@@ -90,8 +91,8 @@ def detail(bvid:str, cid:int, headers:dict, qn=112):
     url = 'https://api.bilibili.com/x/player/playurl?bvid={}&cid={}&qn={}&fourk=1&fnval=4048'.format(bvid, cid, qn)
     res = requests.get(url=url, headers=headers)
     if qn not in res.json()['data']['accept_quality']:
-        print('未检测到该视频质量！')
-        return None
+        print("Can't find the video quality")
+        sys.exit(1)
     else:
         video_inf = res.json()['data']['dash']['video']
         for i in video_inf:
@@ -190,28 +191,24 @@ def ep(ep_id, headers):
     
     return episodes
 
-def main(bvid:str, qn:int, thread:int, download_path:str, login:int, output:int, name:str):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36 Edg/105.0.1336.2',
-        'Referer': 'https://www.bilibili.com/'
-    }
-
-    if os.path.exists('{}\config.json'.format(os.path.dirname(os.path.realpath(__file__)))) and login == 0:
-        print('检测到config.json')
+def main(bvid:str, qn:int, thread:int, download_path:str, output:int, name:str, headers:dict):
+    if os.path.exists('{}\config.json'.format(os.path.dirname(os.path.realpath(__file__)))):
+        print('Find config.json')
         with open('{}\config.json'.format(os.path.dirname(os.path.realpath(__file__))), 'r') as file:
             file = json.loads(file.read())
             cookies = file['cookies']
-            print('config.json最后登陆时间:  {}'.format(file['timestamp']))
+            print('Last login time:  {}'.format(file['timestamp']))
         headers['Cookie'] = cookies
     else:
-        print('请先扫码登陆, 等待时间为60s')
+        print('Please scan QR Code to login. You will have 60 seconds to login.')
         cookies = login(headers)
         if cookies:
             set_config(cookies, os.path.dirname(os.path.realpath(__file__)))
             headers['Cookie'] = cookies
+            print('Login successful. Login cookies is saved to config.json.')
         else:
-            print('登录失败! 请重新尝试')
-            return None
+            print('Login failed. Please try again later.')
+            sys.exit(1)
 
     mid = cookies.split(';')[0].split('=')[1]
     cid = bvid_to_cid(bvid, headers)
@@ -219,26 +216,28 @@ def main(bvid:str, qn:int, thread:int, download_path:str, login:int, output:int,
     # ttl = heartbeat(aid, mid, cid, headers)
 
     tuple = detail(bvid, cid, headers, qn)
-    print(file_name)
+    print('')
+    print("File name: " + file_name)
+    print('')
 
     if tuple:
-        with Progress(TextColumn('{task.description}'), DownloadColumn(binary_units = True), BarColumn(), TransferSpeedColumn(), SpinnerColumn(), TimeRemainingColumn()) as progress:
+        with Progress(TextColumn('{task.description}'), DownloadColumn(binary_units = True), BarColumn(), TransferSpeedColumn(), TimeRemainingColumn(), ' | ', TimeElapsedColumn()) as progress:
             res = requests.get(url=tuple[0], headers = headers, stream=True)
             size = res.headers['Content-Length']
             task = progress.add_task('Downloading_Video...', total = int(size))
             download_threader = Download_threader(tuple[0], headers['Cookie'], int(size), thread, progress, task, 'video', download_path)
             download_threader.download_thread()
-        with Progress(TextColumn('{task.description}'), DownloadColumn(binary_units = True), BarColumn(), TransferSpeedColumn(), SpinnerColumn(), TimeRemainingColumn()) as progress:
+        with Progress(TextColumn('{task.description}'), DownloadColumn(binary_units = True), BarColumn(), TransferSpeedColumn(), TimeRemainingColumn(), ' | ', TimeElapsedColumn()) as progress:
             res = requests.get(url=tuple[1], headers = headers, stream=True)
             size = res.headers['Content-Length']
             task = progress.add_task('Downloading_Audio...', total = int(size))
             download_threader = Download_threader(tuple[1], headers['Cookie'], int(size), thread, progress, task, 'audio', download_path)
             download_threader.download_thread()
     print('Combining...')
-    if output == 1:
-        os.system(r"{0}\\ffmpeg.exe -i {1}\\video.m4s -i {1}\\audio.m4s -c copy {1}\\output.mp4 -loglevel quiet".format(os.path.dirname(os.path.realpath(__file__)), download_path))
+    if output:
+        os.system(r"{0}\\ffmpeg.exe -i {1}\\video.m4s -i {1}\\audio.m4s -c copy {1}\\output.mp4 ".format(os.path.dirname(os.path.realpath(__file__)), download_path))
     else:
-        os.system(r"{0}\\ffmpeg.exe -i {1}\\video.m4s -i {1}\\audio.m4s -c copy {1}\\output.mp4".format(os.path.dirname(os.path.realpath(__file__)), download_path))
+        os.system(r"{0}\\ffmpeg.exe -i {1}\\video.m4s -i {1}\\audio.m4s -c copy {1}\\output.mp4 -loglevel quiet".format(os.path.dirname(os.path.realpath(__file__)), download_path))
     os.remove(r'{}\\video.m4s'.format(download_path))
     os.remove(r'{}\\audio.m4s'.format(download_path))
     os.rename('{}\\output.mp4'.format(download_path), '{}\\{}.mp4'.format(download_path, file_name))
@@ -246,25 +245,43 @@ def main(bvid:str, qn:int, thread:int, download_path:str, login:int, output:int,
 
 # cmd 输入参数
 parser = argparse.ArgumentParser(description='bilibili download ')
-parser.add_argument('-b', '--bvid', type=str, required=True, help='指定视频BV号')
-parser.add_argument('-q', '--qn',  type=int, required=True, help="超高清8K:127 超清4K:120 1080P60:116 1080P+:112 1080P:80 720P:64 480P:32 320P:16")
-parser.add_argument('-t', '--thread',  type=int, default=8, help='下载线程数, 默认为8')
-parser.add_argument('-l', '--login',  type=int, default=0, help='指定值为 1 以重新登录')
-parser.add_argument('-o', '--output',  type=int, default=1, help='ffmpeg是否静默运行: 1 为静默 0 为输出')
+parser.add_argument('-b', '--bvid', type=str, help="指定视频BV号")
+parser.add_argument('-q', '--qn',  type=int, choices=[16,32,64,80,112,116,120,127], help="超高清8K:127 超清4K:120 1080P60:116 1080P+:112 1080P:80 720P:64 480P:32 320P:16")
+parser.add_argument('-t', '--thread',  type=int, default=8, choices=[2,4,8,16,32], help='下载线程数, 默认为8')
 parser.add_argument('-n', '--name',  type=str, default = '', help='对下载视频重新命名')
-parser.add_argument('-e', '--ep',  type=str, default = '', help='指定番剧号')
+parser.add_argument('-e', '--ep',  type=str, help='指定番剧号')
+parser.add_argument('-l', '--login', action='store_true', default=False, help='仅登录')
+parser.add_argument('-o', '--output', action='store_true', default=False, help='保留ffmpeg输出')
 
 args = parser.parse_args()
 
 if __name__ == '__main__':
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36 Edg/105.0.1336.2',
+        'Referer': 'https://www.bilibili.com/'
+    } 
+    if args.login:
+        login(headers)
+        print('Login successful. Login cookies is saved to config.json.')
+        sys.exit(0)    
+    if args.bvid==None and args.ep==None:
+        print('Please enter BVID or EPID.')
+        print("Use 'python bilibili.py -h' to show helps.")
+        sys.exit(1)
+    if args.qn==None:
+        print('Please enter the video quality.')
+        sys.exit(1)
+
     download_path = os.path.dirname(os.path.realpath(__file__)) + r'\Download'
     try:
         os.mkdir(download_path)  # 创建下载目录
     except FileExistsError:
         pass
-    print('下载目录为: ' + download_path)
+    print('Download Directory : ' + download_path)
+    print('')
     
     if os.path.exists(os.path.dirname(os.path.realpath(__file__)) + r'\\ffmpeg.exe'):
-        main(args.bvid, args.qn, args.thread, download_path, args.login, args.output, args.name)
+        main(args.bvid, args.qn, args.thread, download_path, args.output, args.name, headers)
     else:
-        print('未检测到ffmpeg.exe, 请将ffmpeg放于工作目录根目录下')
+        print("Can't find ffmpeg.exe. Please put ffmpeg.exe in your working directory.")
+        sys.exit(1)
