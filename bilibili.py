@@ -221,13 +221,13 @@ def main(bvid:str, qn:int, thread:int, download_path:str, output:int, name:str, 
     print('')
 
     if tuple:
-        with Progress(TextColumn('{task.description}'), DownloadColumn(binary_units = True), BarColumn(), TransferSpeedColumn(), TimeRemainingColumn(), ' | ', TimeElapsedColumn()) as progress:
+        with Progress(TextColumn('{task.description}'), DownloadColumn(binary_units = True), BarColumn(), TransferSpeedColumn(), '·' , TimeRemainingColumn(), '·', TimeElapsedColumn()) as progress:
             res = requests.get(url=tuple[0], headers = headers, stream=True)
             size = res.headers['Content-Length']
             task = progress.add_task('Downloading_Video...', total = int(size))
             download_threader = Download_threader(tuple[0], headers['Cookie'], int(size), thread, progress, task, 'video', download_path)
             download_threader.download_thread()
-        with Progress(TextColumn('{task.description}'), DownloadColumn(binary_units = True), BarColumn(), TransferSpeedColumn(), TimeRemainingColumn(), ' | ', TimeElapsedColumn()) as progress:
+        with Progress(TextColumn('{task.description}'), DownloadColumn(binary_units = True), BarColumn(), TransferSpeedColumn(), '·' , TimeRemainingColumn(), '·', TimeElapsedColumn()) as progress:
             res = requests.get(url=tuple[1], headers = headers, stream=True)
             size = res.headers['Content-Length']
             task = progress.add_task('Downloading_Audio...', total = int(size))
