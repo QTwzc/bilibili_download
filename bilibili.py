@@ -249,7 +249,7 @@ parser.add_argument('-b', '--bvid', type=str, help="指定视频BV号")
 parser.add_argument('-q', '--qn',  type=int, choices=[16,32,64,80,112,116,120,127], help="超高清8K:127 超清4K:120 1080P60:116 1080P+:112 1080P:80 720P:64 480P:32 320P:16")
 parser.add_argument('-t', '--thread',  type=int, default=8, choices=[2,4,8,16,32], help='下载线程数, 默认为8')
 parser.add_argument('-n', '--name',  type=str, default = '', help='对下载视频重新命名')
-parser.add_argument('-e', '--ep',  type=str, help='指定番剧号')
+# parser.add_argument('-e', '--ep',  type=str, help='指定番剧号')
 parser.add_argument('-l', '--login', action='store_true', default=False, help='仅登录')
 parser.add_argument('-o', '--output', action='store_true', default=False, help='保留ffmpeg输出')
 

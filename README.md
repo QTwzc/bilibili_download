@@ -33,6 +33,10 @@
 
     python bilibili.py [OPTIONS]
 
+    examples:
+        python bilibili.py -b BV1E44y1t7Kn -q 120
+        python bilibili.py -b BV1E44y1t7Kn -q 120 -n test -t 16 -o
+
 ## 3. Tips
 * 目前还未支持番剧批量下载， 其实番剧的批量链接获取函数已经完成，等后续将会更新此功能
 * 音频目前获取的默认为最高质量音频，未提供可选择接口，若有需求，可自行更改源码
@@ -53,7 +57,6 @@
                     audio_url = res.json()['data']['dash']['audio'][0]['baseUrl']  #  此处可以更改音频获取链接, 将[0]改成其他索引即可，建议索引范围在0~2
                     return video_url, audio_url
     ```
-* 目前B站cookies获取方式为二维码登录，cookies有效期在15d-30d之间，建议定期重新登录
+* 目前B站cookies获取方式为二维码登录，cookies有效期在15天-30天之间，建议定期重新登录
 * 番剧BV号获取方法：
-
     在网页端打开想要下载的番剧，浏览器全屏后，可以在番剧介绍处找到BV号
